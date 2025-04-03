@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROLI Seaboard Web Emulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: #000000;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-right: 20px;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .canvas-container {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            background-color: #2a2a2a;
+        }
+
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+
+        .control-panel {
+            background-color: #333333;
+            padding: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            margin-right: 15px;
+        }
+
+        button {
+            background-color: #4a4a4a;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #5a5a5a;
+        }
+
+        button:active {
+            background-color: #3a3a3a;
+        }
+
+        button.recording {
+            background-color: #cc0000;
+        }
+
+        select, input {
+            background-color: #4a4a4a;
+            color: white;
+            border: none;
+            padding: 5px;
+            border-radius: 4px;
+            margin-top: 3px;
+        }
+
+        label {
+            font-size: 0.8rem;
+            margin-bottom: 3px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            margin-left: auto;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #555;
+            margin-right: 5px;
+        }
+
+        .status-dot.active {
+            background-color: #00cc00;
+        }
+
+        .status-text {
+            font-size: 0.8rem;
+        }
+
+        .touch-visualization {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+        }
+
+        .help-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .help-content {
+            max-width: 600px;
+            color: white;
+        }
+
+        .help-content h2 {
+            margin-bottom: 15px;
+        }
+
+        .help-content h3 {
+            margin: 15px 0 5px 0;
+        }
+
+        .help-content p {
+            margin-bottom: 10px;
+        }
+
+        .help-content ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .close-help {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .help-button {
+            margin-left: 10px;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            header {
+                padding: 5px 10px;
+            }
+
+            h1 {
+                font-size: 1.2rem;
+            }
+
+            .control-panel {
+                padding: 5px;
+            }
+
+            button {
+                padding: 6px 10px;
+                margin-right: 5px;
+            }
+
+            .control-group {
+                margin-right: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 1rem;
+                margin-bottom: 5px;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .control-panel {
+                overflow-x: auto;
+                white-space: nowrap;
+                justify-content: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>ROLI Seaboard Web Emulator</h1>
+        <div>
+            <button id="start-audio">Start Audio</button>
+            <button id="help-button" class="help-button">Help</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="canvas-container">
+            <canvas id="seaboard-canvas"></canvas>
+        </div>
+
+        <div class="control-panel">
+            <div class="control-group">
+                <label for="oscillator-type">Oscillator Type</label>
+                <select id="oscillator-type">
+                    <option value="sine">Sine</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="sawtooth">Sawtooth</option>
+                    <option value="square">Square</option>
+                    <option value="fmsine">FM Sine</option>
+                    <option value="fmtriangle">FM Triangle</option>
+                    <option value="fmsawtooth">FM Sawtooth</option>
+                    <option value="fmsquare">FM Square</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="reverb">Reverb</label>
+                <input type="range" id="reverb" min="0" max="1" step="0.01" value="0.3">
+            </div>
+
+            <div class="control-group">
+                <label for="delay">Delay</label>
+                <input type="range" id="delay" min="0" max="1" step="0.01" value="0.2">
+            </div>
+
+            <div class="control-group">
+                <label for="pressure-sensitivity">Pressure Sensitivity</label>
+                <input type="range" id="pressure-sensitivity" min="0.1" max="2" step="0.1" value="1">
+            </div>
+
+            <button id="record">Record</button>
+            <button id="stop-record" disabled>Stop Recording</button>
+            <button id="download" disabled>Download Recording</button>
+
+            <div class="status-indicator">
+                <div class="status-dot" id="status-dot"></div>
+                <span class="status-text" id="status-text">Ready</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="help-overlay" id="help-overlay">
+        <button class="close-help" id="close-help">&times;</button>
+        <div class="help-content">
+            <h2>ROLI Seaboard Web Emulator Help</h2>
+            
+            <h3>Getting Started</h3>
+            <p>Click "Start Audio" to initialize the audio engine. This is required before any sound can be produced.</p>
+            
+            <h3>5D Touch Interactions</h3>
+            <p>The ROLI Seaboard is known for its "5D Touch" technology:</p>
+            <ul>
+                <li><strong>Strike:</strong> Initial tap/click on a key determines the note's initial volume.</li>
+                <li><strong>Press:</strong> Pressure after striking (use vertical mouse movement on non-touch devices).</li>
+                <li><strong>Glide:</strong> Horizontal movement across keys for pitch transitions.</li>
+                <li><strong>Slide:</strong> Vertical movement on a key to modify timbre.</li>
+                <li><strong>Lift:</strong> How you release affects the note's fade-out.</li>
+            </ul>
+            
+            <h3>Controls</h3>
+            <ul>
+                <li><strong>Oscillator Type:</strong> Changes the basic sound character.</li>
+                <li><strong>Reverb:</strong> Adds space and ambience.</li>
+                <li><strong>Delay:</strong> Creates echo effects.</li>
+                <li><strong>Pressure Sensitivity:</strong> Adjusts how responsive the instrument is to pressure/vertical movement.</li>
+            </ul>
+            
+            <h3>Recording</h3>
+            <p>Click "Record" to start recording, "Stop Recording" when finished, and "Download Recording" to save your performance.</p>
+            
+            <h3>Tips</h3>
+            <ul>
+                <li>Use multiple fingers on touch devices for chords.</li>
+                <li>Combine different dimensions for expressive playing.</li>
+                <li>Experiment with different oscillator types for varied sounds.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let audioContext;
+        let synth;
+        let reverb;
+        let delay;
+        let recorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let activeNotes = new Map();
+        let canvas;
+        let ctx;
+        let keyboardLayout = [];
+        let pressureSensitivity = 1;
+        let audioInitialized = false;
+        let touchVisualizations = new Map();
+
+        // DOM elements
+        const startAudioButton = document.getElementById('start-audio');
+        const oscillatorTypeSelect = document.getElementById('oscillator-type');
+        const reverbControl = document.getElementById('reverb');
+        const delayControl = document.getElementById('delay');
+        const pressureSensitivityControl = document.getElementById('pressure-sensitivity');
+        const recordButton = document.getElementById('record');
+        const stopRecordButton = document.getElementById('stop-record');
+        const downloadButton = document.getElementById('download');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const helpButton = document.getElementById('help-button');
+        const helpOverlay = document.getElementById('help-overlay');
+        const closeHelpButton = document.getElementById('close-help');
+        const canvasContainer = document.querySelector('.canvas-container');
+
+        // Initialize the application
+        function init() {
+            // Set up canvas
+            canvas = document.getElementById('seaboard-canvas');
+            ctx = canvas.getContext('2d');
+            
+            // Set up event listeners
+            startAudioButton.addEventListener('click', initAudio);
+            oscillatorTypeSelect.addEventListener('change', updateOscillatorType);
+            reverbControl.addEventListener('input', updateReverb);
+            delayControl.addEventListener('input', updateDelay);
+            pressureSensitivityControl.addEventListener('input', updatePressureSensitivity);
+            recordButton.addEventListener('click', startRecording);
+            stopRecordButton.addEventListener('click', stopRecording);
+            downloadButton.addEventListener('click', downloadRecording);
+            helpButton.addEventListener('click', showHelp);
+            closeHelpButton.addEventListener('click', hideHelp);
+            
+            // Set up touch and mouse events
+            canvas.addEventListener('pointerdown', handlePointerDown);
+            canvas.addEventListener('pointermove', handlePointerMove);
+            canvas.addEventListener('pointerup', handlePointerUp);
+            canvas.addEventListener('pointercancel', handlePointerUp);
+            canvas.addEventListener('pointerleave', handlePointerUp);
+            
+            // For devices that don't support pointer events
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd);
+            canvas.addEventListener('touchcancel', handleTouchEnd);
+            
+            // For older browsers
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('mouseleave', handleMouseUp);
+            
+            // Handle window resize
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Initial canvas setup
+            resizeCanvas();
+            createKeyboardLayout();
+            drawKeyboard();
+            
+            // Update status
+            updateStatus('Ready. Click "Start Audio" to begin.');
+        }
+
+        // Initialize audio context and synth
+        function initAudio() {
+            if (audioInitialized) return;
+            
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create Tone.js synth
+                synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                synth.set({
+                    oscillator: {
+                        type: oscillatorTypeSelect.value
+                    },
+                    envelope: {
+                        attack: 0.05,
+                        decay: 0.3,
+                        sustain: 0.6,
+                        release: 1
+                    }
+                });
+                
+                // Set up effects
+                reverb = new Tone.Reverb({
+                    decay: 3,
+                    wet: parseFloat(reverbControl.value)
+                }).toDestination();
+                
+                delay = new Tone.FeedbackDelay({
+                    delayTime: 0.25,
+                    feedback: 0.3,
+                    wet: parseFloat(delayControl.value)
+                }).toDestination();
+                
+                // Connect synth to effects
+                synth.connect(reverb);
+                synth.connect(delay);
+                
+                // Start Tone.js
+                Tone.start();
+                
+                // Set up recorder
+                const dest = Tone.getDestination();
+                recorder = new Tone.Recorder();
+                dest.connect(recorder);
+                
+                audioInitialized = true;
+                startAudioButton.disabled = true;
+                updateStatus('Audio initialized. Ready to play!');
+                statusDot.classList.add('active');
+            } catch (error) {
+                console.error('Error initializing audio:', error);
+                updateStatus('Error initializing audio. Please try again.');
+            }
+        }
+
+        // Create keyboard layout
+        function createKeyboardLayout() {
+            keyboardLayout = [];
+            const numKeys = 24; // 2 octaves
+            const whiteKeyWidth = canvas.width / (numKeys * 0.6);
+            const blackKeyWidth = whiteKeyWidth * 0.6;
+            const whiteKeyHeight = canvas.height;
+            const blackKeyHeight = whiteKeyHeight * 0.6;
+            
+            let x = 0;
+            for (let i = 0; i < numKeys; i++) {
+                const note = i % 12;
+                const octave = Math.floor(i / 12) + 3; // Start from C3
+                const isBlack = [1, 3, 6, 8, 10].includes(note);
+                
+                if (!isBlack) {
+                    // White key
+                    keyboardLayout.push({
+                        x: x,
+                        y: 0,
+                        width: whiteKeyWidth,
+                        height: whiteKeyHeight,
+                        note: getNoteFromNumber(note, octave),
+                        isBlack: false,
+                        isActive: false,
+                        pressure: 0
+                    });
+                    x += whiteKeyWidth;
+                }
+            }
+            
+            // Add black keys on top
+            x = 0;
+            for (let i = 0; i < numKeys; i++) {
+                const note = i % 12;
+                const octave = Math.floor(i / 12) + 3; // Start from C3
+                const isBlack = [1, 3, 6, 8, 10].includes(note);
+                
+                if (!isBlack) {
+                    // Check if we need to add a black key after this white key
+                    if (![4, 11].includes(note)) {
+                        keyboardLayout.push({
+                            x: x + whiteKeyWidth - blackKeyWidth / 2,
+                            y: 0,
+                            width: blackKeyWidth,
+                            height: blackKeyHeight,
+                            note: getNoteFromNumber(note + 1, octave),
+                            isBlack: true,
+                            isActive: false,
+                            pressure: 0
+                        });
+                    }
+                    x += whiteKeyWidth;
+                }
+            }
+        }
+
+        // Get note name from number
+        function getNoteFromNumber(note, octave) {
+            const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            return notes[note] + octave;
+        }
+
+        // Draw keyboard
+        function drawKeyboard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw white keys first
+            keyboardLayout.forEach(key => {
+                if (!key.isBlack) {
+                    drawKey(key);
+                }
+            });
+            
+            // Then draw black keys on top
+            keyboardLayout.forEach(key => {
+                if (key.isBlack) {
+                    drawKey(key);
+                }
+            });
+        }
+
+        // Draw a single key
+        function drawKey(key) {
+            ctx.fillStyle = key.isBlack ? '#222222' : '#FFFFFF';
+            
+            // If key is active, adjust color based on pressure
+            if (key.isActive) {
+                const pressureColor = key.isBlack ? 
+                    `rgb(${40 + key.pressure * 100}, ${40 + key.pressure * 40}, ${150 + key.pressure * 100})` :
+                    `rgb(${150 + key.pressure * 100}, ${150 + key.pressure * 40}, ${255})`;
+                ctx.fillStyle = pressureColor;
+            }
+            
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            
+            // Draw rounded rectangle for key
+            const radius = key.isBlack ? 3 : 5;
+            ctx.beginPath();
+            ctx.moveTo(key.x + radius, key.y);
+            ctx.lineTo(key.x + key.width - radius, key.y);
+            ctx.quadraticCurveTo(key.x + key.width, key.y, key.x + key.width, key.y + radius);
+            ctx.lineTo(key.x + key.width, key.y + key.height - radius);
+            ctx.quadraticCurveTo(key.x + key.width, key.y + key.height, key.x + key.width - radius, key.y + key.height);
+            ctx.lineTo(key.x + radius, key.y + key.height);
+            ctx.quadraticCurveTo(key.x, key.y + key.height, key.x, key.y + key.height - radius);
+            ctx.lineTo(key.x, key.y + radius);
+            ctx.quadraticCurveTo(key.x, key.y, key.x + radius, key.y);
+            ctx.closePath();
+            
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw note name at bottom of white keys
+            if (!key.isBlack) {
+                ctx.fillStyle = '#000000';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(key.note, key.x + key.width / 2, key.y + key.height - 10);
+            }
+        }
+
+        // Resize canvas to fit container
+        function resizeCanvas() {
+            canvas.width = canvasContainer.clientWidth;
+            canvas.height = canvasContainer.clientHeight;
+            createKeyboardLayout();
+            drawKeyboard();
+        }
+
+        // Find key at position
+        function findKeyAtPosition(x, y) {
+            // Check black keys first (they're on top)
+            for (const key of keyboardLayout) {
+                if (key.isBlack && 
+                    x >= key.x && x <= key.x + key.width && 
+                    y >= key.y && y <= key.y + key.height) {
+                    return key;
+                }
+            }
+            
+            // Then check white keys
+            for (const key of keyboardLayout) {
+                if (!key.isBlack && 
+                    x >= key.x && x <= key.x + key.width && 
+                    y >= key.y && y <= key.y + key.height) {
+                    return key;
+                }
+            }
+            
+            return null;
+        }
+
+        // Play note
+        function playNote(key, velocity = 0.7) {
+            if (!audioInitialized) return;
+            
+            const adjustedVelocity = Math.min(Math.max(velocity, 0.1), 1);
+            synth.triggerAttack(key.note, Tone.now(), adjustedVelocity);
+            key.isActive = true;
+            key.pressure = adjustedVelocity;
+            drawKeyboard();
+        }
+
+        // Update note pressure
+        function updateNotePressure(key, pressure) {
+            if (!key.isActive || !audioInitialized) return;
+            
+            const adjustedPressure = Math.min(Math.max(pressure * pressureSensitivity, 0.1), 1);
+            key.pressure = adjustedPressure;
+            
+            // Update synth parameters based on pressure
+            synth.set({
+                envelope: {
+                    sustain: adjustedPressure * 0.8
+                }
+            });
+            
+            // If using FM oscillator, modulate the modulation index
+            if (oscillatorTypeSelect.value.startsWith('fm')) {
+                synth.set({
+                    oscillator: {
+                        modulationIndex: adjustedPressure * 10
+                    }
+                });
+            }
+            
+            drawKeyboard();
+        }
+
+        // Stop note
+        function stopNote(key) {
+            if (!audioInitialized) return;
+            
+            synth.triggerRelease(key.note);
+            key.isActive = false;
+            key.pressure = 0;
+            drawKeyboard();
+        }
+
+        // Handle pointer down event
+        function handlePointerDown(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const key = findKeyAtPosition(x, y);
+            if (key) {
+                // Calculate initial velocity based on pointer properties
+                const velocity = e.pressure ? e.pressure : 0.7;
+                
+                // Store pointer info
+                activeNotes.set(e.pointerId, {
+                    key: key,
+                    startX: x,
+                    startY: y,
+                    lastX: x,
+                    lastY: y
+                });
+                
+                playNote(key, velocity);
+                createTouchVisualization(e.pointerId, x, y, velocity);
+            }
+        }
+
+        // Handle pointer move event
+        function handlePointerMove(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const activeNote = activeNotes.get(e.pointerId);
+            if (activeNote) {
+                // Check if moved to a different key (glide)
+                const newKey = findKeyAtPosition(x, y);
+                if (newKey && newKey !== activeNote.key) {
+                    // Stop old note
+                    stopNote(activeNote.key);
+                    
+                    // Start new note
+                    playNote(newKey, activeNote.key.pressure);
+                    
+                    // Update active note
+                    activeNote.key = newKey;
+                }
+                
+                // Calculate pressure from vertical position (slide)
+                const normalizedY = Math.min(Math.max(y / canvas.height, 0), 1);
+                const pressure = 1 - normalizedY; // Invert so higher on key = less pressure
+                updateNotePressure(activeNote.key, pressure);
+                
+                // Update position
+                activeNote.lastX = x;
+                activeNote.lastY = y;
+                
+                // Update visualization
+                updateTouchVisualization(e.pointerId, x, y, pressure);
+            }
+        }
+
+        // Handle pointer up event
+        function handlePointerUp(e) {
+            e.preventDefault();
+            const activeNote = activeNotes.get(e.pointerId);
+            if (activeNote) {
+                stopNote(activeNote.key);
+                activeNotes.delete(e.pointerId);
+                removeTouchVisualization(e.pointerId);
+            }
+        }
+
+        // Handle touch events for devices that don't support pointer events
+        function handleTouchStart(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                
+                const key = findKeyAtPosition(x, y);
+                if (key) {
+                    // Store touch info
+                    activeNotes.set(touch.identifier, {
+                        key: key,
+                        startX: x,
+                        startY: y,
+                        lastX: x,
+                        lastY: y
+                    });
+                    
+                    playNote(key, 0.7);
+                    createTouchVisualization(touch.identifier, x, y, 0.7);
+                }
+            }
+        }
+
+        function handleTouchMove(e) {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                
+                const activeNote = activeNotes.get(touch.identifier);
+                if (activeNote) {
+                    // Check if moved to a different key (glide)
+                    const newKey = findKeyAtPosition(x, y);
+                    if (newKey && newKey !== activeNote.key) {
+                        // Stop old note
+                        stopNote(activeNote.key);
+                        
+                        // Start new note
+                        playNote(newKey, activeNote.key.pressure);
+                        
+                        // Update active note
+                        activeNote.key = newKey;
+                    }
+                    
+                    // Calculate pressure from vertical position (slide)
+                    const normalizedY = Math.min(Math.max(y / canvas.height, 0), 1);
+                    const pressure = 1 - normalizedY;
+                    updateNotePressure(activeNote.key, pressure);
+                    
+                    // Update position
+                    activeNote.lastX = x;
+                    activeNote.lastY = y;
+                    
+                    // Update visualization
+                    updateTouchVisualization(touch.identifier, x, y, pressure);
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                const touch = e.changedTouches[i];
+                const activeNote = activeNotes.get(touch.identifier);
+                
+                if (activeNote) {
+                    stopNote(activeNote.key);
+                    activeNotes.delete(touch.identifier);
+                    removeTouchVisualization(touch.identifier);
+                }
+            }
+        }
+
+        // Handle mouse events for browsers that don't support pointer events
+        function handleMouseDown(e) {
+            // Only handle if pointer events aren't being used
+            if (window.PointerEvent) return;
+            
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const key = findKeyAtPosition(x, y);
+            if (key) {
+                // Store mouse info with special ID
+                activeNotes.set('mouse', {
+                    key: key,
+                    startX: x,
+                    startY: y,
+                    lastX: x,
+                    lastY: y
+                });
+                
+                playNote(key, 0.7);
+                createTouchVisualization('mouse', x, y, 0.7);
+            }
+        }
+
+        function handleMouseMove(e) {
+            // Only handle if pointer events aren't being used
+            if (window.PointerEvent) return;
+            
+            e.preventDefault();
+            const activeNote = activeNotes.get('mouse');
+            
+            if (activeNote) {
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                // Check if moved to a different key (glide)
+                const newKey = findKeyAtPosition(x, y);
+                if (newKey && newKey !== activeNote.key) {
+                    // Stop old note
+                    stopNote(activeNote.key);
+                    
+                    // Start new note
+                    playNote(newKey, activeNote.key.pressure);
+                    
+                    // Update active note
+                    activeNote.key = newKey;
+                }
+                
+                // Calculate pressure from vertical position (slide)
+                const normalizedY = Math.min(Math.max(y / canvas.height, 0), 1);
+                const pressure = 1 - normalizedY;
+                updateNotePressure(activeNote.key, pressure);
+                
+                // Update position
+                activeNote.lastX = x;
+                activeNote.lastY = y;
+                
+                // Update visualization
+                updateTouchVisualization('mouse', x, y, pressure);
+            }
+        }
+
+        function handleMouseUp(e) {
+            // Only handle if pointer events aren't being used
+            if (window.PointerEvent) return;
+            
+            e.preventDefault();
+            const activeNote = activeNotes.get('mouse');
+            
+            if (activeNote) {
+                stopNote(activeNote.key);
+                activeNotes.delete('mouse');
+                removeTouchVisualization('mouse');
+            }
+        }
+
+        // Create visual feedback for touch/pointer
+        function createTouchVisualization(id, x, y, pressure) {
+            const element = document.createElement('div');
+            element.className = 'touch-visualization';
+            element.style.left = `${x}px`;
+            element.style.top = `${y}px`;
+            
+            const size = 20 + pressure * 30;
+            element.style.width = `${size}px`;
+            element.style.height = `${size}px`;
+            
+            canvasContainer.appendChild(element);
+            touchVisualizations.set(id, element);
+        }
+
+        // Update touch visualization
+        function updateTouchVisualization(id, x, y, pressure) {
+            const element = touchVisualizations.get(id);
+            if (element) {
+                element.style.left = `${x}px`;
+                element.style.top = `${y}px`;
+                
+                const size = 20 + pressure * 30;
+                element.style.width = `${size}px`;
+                element.style.height = `${size}px`;
+                
+                // Adjust opacity based on pressure
+                element.style.opacity = 0.3 + pressure * 0.5;
+            }
+        }
+
+        // Remove touch visualization
+        function removeTouchVisualization(id) {
+            const element = touchVisualizations.get(id);
+            if (element) {
+                element.remove();
+                touchVisualizations.delete(id);
+            }
+        }
+
+        // Update oscillator type
+        function updateOscillatorType() {
+            if (!audioInitialized) return;
+            
+            const oscillatorType = oscillatorTypeSelect.value;
+            synth.set({
+                oscillator: {
+                    type: oscillatorType
+                }
+            });
+        }
+
+        // Update reverb
+        function updateReverb() {
+            if (!audioInitialized) return;
+            
+            const reverbWet = parseFloat(reverbControl.value);
+            reverb.wet.value = reverbWet;
+        }
+
+        // Update delay
+        function updateDelay() {
+            if (!audioInitialized) return;
+            
+            const delayWet = parseFloat(delayControl.value);
+            delay.wet.value = delayWet;
+        }
+
+        // Update pressure sensitivity
+        function updatePressureSensitivity() {
+            pressureSensitivity = parseFloat(pressureSensitivityControl.value);
+        }
+
+        // Start recording
+        function startRecording() {
+            if (!audioInitialized) return;
+            
+            recorder.start();
+            isRecording = true;
+            recordButton.disabled = true;
+            stopRecordButton.disabled = false;
+            downloadButton.disabled = true;
+            
+            recordButton.classList.add('recording');
+            updateStatus('Recording...');
+        }
+
+        // Stop recording
+        function stopRecording() {
+            if (!audioInitialized || !isRecording) return;
+            
+            recorder.stop().then((blob) => {
+                audioChunks = blob;
+                isRecording = false;
+                recordButton.disabled = false;
+                stopRecordButton.disabled = true;
+                downloadButton.disabled = false;
+                
+                recordButton.classList.remove('recording');
+                updateStatus('Recording stopped. Ready to download.');
+            });
+        }
+
+        // Download recording
+        function downloadRecording() {
+            if (!audioChunks) return;
+            
+            const url = URL.createObjectURL(audioChunks);
+            const a = document.createElement('a');
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            a.href = url;
+            a.download = `seaboard-recording-${timestamp}.webm`;
+            a.click();
+            
+            updateStatus('Recording downloaded.');
+        }
+
+        // Update status display
+        function updateStatus(message) {
+            statusText.textContent = message;
+        }
+
+        // Show help overlay
+        function showHelp() {
+            helpOverlay.style.display = 'flex';
+        }
+
+        // Hide help overlay
+        function hideHelp() {
+            helpOverlay.style.display = 'none';
+        }
+
+        // Initialize the application when the page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
